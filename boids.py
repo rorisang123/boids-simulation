@@ -9,7 +9,7 @@ This version uses a spatial partitioning grid to improve performance.
 Copyright (c) 2021  Nikolaus Stromberg  nikorasu85@gmail.com
 '''
 FLLSCRN = False          # True for Fullscreen, or False for Window
-BOIDZ = 20             # How many boids to spawn, too many may slow fps
+BOIDZ = 40             # How many boids to spawn, too many may slow fps
 WRAP = False            # False avoids edges, True wraps to other side
 FISH = False            # True to turn boids into fish
 SPEED = 150             # Movement speed
@@ -97,8 +97,8 @@ class Boid(pg.sprite.Sprite):
         for obstacle in obstacles:
             if self.rect.colliderect(obstacle.rect):
                 obstacleCenter = pg.Vector2(obstacle.rect.center)
-                obstacleDiff = obstacleCenter - selfCenter
-                obstacleDistance, obstacleAngle = pg.math.Vector2.as_polar(obstacleDiff)
+                obstacleDiff = obstacleCenter - (5 * selfCenter)
+                obstacleDistance, obstacleAngle = pg.math.Vector2.as_polar(5*obstacleDiff)
                 if obstacleDistance < self.bSize:
                     tAngle = degrees(atan2(obstacleDiff.y, obstacleDiff.x)) + 180
                     angleDiff = (tAngle - self.ang) + 180
