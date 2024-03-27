@@ -15,35 +15,35 @@ while not terminated:
 print(f"Total reward: {total_reward}")
 
 # Model training
-# import gym
-# from stable_baselines3 import PPO
-# from stable_baselines3.common.vec_env import DummyVecEnv
-# from stable_baselines3.common.evaluation import evaluate_policy
+import gym
+from stable_baselines3 import PPO
+from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.evaluation import evaluate_policy
 
-# env = gym.make(env_name)
-# env = DummyVecEnv([lambda: env])
-# model = PPO('MlpPolicy', env, verbose=1)
+env = gym.make(env_name)
+env = DummyVecEnv([lambda: env])
+model = PPO('MlpPolicy', env, verbose=1)
 
-# model.learn(total_timesteps=20000)
+model.learn(total_timesteps=20000)
 
-# # save the model
-# model.save('ppo model')
+# save the model
+model.save('ppo model')
 
-# evaluate_policy(model, env, n_eval_episodes=10, render=True)
+evaluate_policy(model, env, n_eval_episodes=10, render=True)
 
-# env.close()
+env.close()
 
-# # Alt implementation
-# for episode in range(1, 11):
-#     score = 0
-#     obs = env.reset()
-#     done = False
+# Alt implementation
+for episode in range(1, 11):
+    score = 0
+    obs = env.reset()
+    done = False
     
-#     while not done:
-#         env.render()
-#         action, _ = model.predict(obs)
-#         obs, reward, done, info = env.step(action)
-#         score += reward
+    while not done:
+        env.render()
+        action, _ = model.predict(obs)
+        obs, reward, done, info = env.step(action)
+        score += reward
         
-#     print('Episode:', episode, 'Score:', score)
-# env.close()
+    print('Episode:', episode, 'Score:', score)
+env.close()

@@ -9,7 +9,7 @@ This version uses a spatial partitioning grid to improve performance.
 Copyright (c) 2021  Nikolaus Stromberg  nikorasu85@gmail.com
 '''
 FLLSCRN = False          # True for Fullscreen, or False for Window
-BOIDZ = 1             # How many boids to spawn, too many may slow fps
+BOIDZ = 20             # How many boids to spawn, too many may slow fps
 WRAP = False            # False avoids edges, True wraps to other side
 FISH = False            # True to turn boids into fish
 SPEED = 150             # Movement speed
@@ -29,7 +29,7 @@ class Boid(pg.sprite.Sprite):
         self.image = pg.Surface((15, 15)).convert()
         self.image.set_colorkey(0)
         self.color = pg.Color(0)  # preps color so we can use hsva
-        self.color.hsva = (randint(0,360), 90, 90) #if cHSV is None else cHSV # randint(5,55) #4goldfish
+        self.color.hsva = (90, 90, 90) 
         if isFish:  # (randint(120,300) + 180) % 360  #4noblues
             pg.draw.polygon(self.image, self.color, ((7,0),(12,5),(3,14),(11,14),(2,5),(7,0)), width=3)
             self.image = pg.transform.scale(self.image, (16, 24))
@@ -40,16 +40,80 @@ class Boid(pg.sprite.Sprite):
         maxW, maxH = self.drawSurf.get_size()
         self.rect = self.image.get_rect(center=(randint(50, maxW - 50), randint(50, maxH - 50)))
         self.ang = randint(0, 360)  # random start angle, & position ^
-        self.pos = pg.Vector2(self.rect.center)
+        self.pos = pg.mouse.get_pos()
         self.grid_lastpos = self.grid.getcell(self.pos)
         self.grid.add(self, self.grid_lastpos)
 
-    def update(self, dt, speed, ejWrap=False):
+    def update(self, dt, speed, ejWrap=False, obstacles=[]):
         maxW, maxH = self.drawSurf.get_size()
         selfCenter = pg.Vector2(self.rect.center)
         turnDir = xvt = yvt = yat = xat = 0
         turnRate = 120 * dt  # about 120 seems ok
-        margin = 42
+        margin = 60
+        self.ang = self.ang + randint(-4, 4)
+        # Grid update stuff
+        self.grid_pos = self.grid.getcell(self.pos)
+        if self.grid_pos != self.grid_lastpos:
+            self.grid.add(self, self.grid_pos)
+            self.grid.remove(self, self.grid_lastpos)
+            self.grid_lastpos = self.grid_pos
+        # get nearby boids and sort by distance
+        near_boids = self.grid.getnear(self, self.grid_pos)
+        neiboids = sorted(near_boids, key=lambda i: pg.Vector2(i.rect.center).distance_to(selfCenter))
+        del neiboids[7:]  # keep 7 closest, dump the rest
+        # check when boid has neighborS (also sets ncount with walrus :=)
+        if (ncount := len(neiboids)) > 1:
+            nearestBoid = pg.Vector2(neiboids[0].rect.center)
+            for nBoid in neiboids:  # adds up neighbor vectors & angles for averaging
+                xvt += nBoid.rect.centerx
+                yvt += nBoid.rect.centery
+                yat += sin(radians(nBoid.ang))
+                xat += cos(radians(nBoid.ang))
+            tAvejAng = degrees(atan2(yat, xat))
+            targetV = (xvt / ncount, yvt / ncount)
+            # if too close, move away from closest neighbor
+            if selfCenter.distance_to(nearestBoid) < self.bSize : targetV = nearestBoid
+            tDiff = targetV - selfCenter  # get angle differences for steering
+            tDistance, tAngle = pg.math.Vector2.as_polar(tDiff)
+            # if boid is close enough to neighbors, match their average angle
+            if tDistance < self.bSize*5 : tAngle = tAvejAng
+            # computes the difference to reach target angle, for smooth steering
+            angleDiff = (tAngle - self.ang) + 180
+            if abs(tAngle - self.ang) > .5: turnDir = (angleDiff / 360 - (angleDiff // 360)) * 360 - 180
+            # if boid gets too close to target, steer away
+            if tDistance < self.bSize and targetV == nearestBoid : turnDir = -turnDir
+        # Avoid edges of screen by turning toward the edge normal-angle
+        sc_x, sc_y = self.rect.centerx, self.rect.centery
+        if not ejWrap and min(sc_x, sc_y, maxW - sc_x, maxH - sc_y) < margin:
+            if sc_x < margin : tAngle = 0
+            elif sc_x > maxW - margin : tAngle = 180
+            if sc_y < margin : tAngle = 90
+            elif sc_y > maxH - margin : tAngle = 270
+            angleDiff = (tAngle - self.ang) + 180  # increase turnRate to keep boids on screen
+            turnDir = (angleDiff / 360 - (angleDiff // 360)) * 360 - 180
+            edgeDist = min(sc_x, sc_y, maxW - sc_x, maxH - sc_y)
+            turnRate = turnRate + (1 - edgeDist / margin) * (20 - turnRate) #turnRate=minRate, 20=maxRate
+        # Avoid obstacles
+        for obstacle in obstacles:
+            if self.rect.colliderect(obstacle.rect):
+                obstacleCenter = pg.Vector2(obstacle.rect.center)
+                obstacleDiff = obstacleCenter - selfCenter
+                obstacleDistance, obstacleAngle = pg.math.Vector2.as_polar(obstacleDiff)
+                if obstacleDistance < self.bSize:
+                    tAngle = degrees(atan2(obstacleDiff.y, obstacleDiff.x)) + 180
+                    angleDiff = (tAngle - self.ang) + 180
+                    turnDir = (angleDiff / 360 - (angleDiff // 360)) * 360 - 180
+                    break
+
+        if turnDir != 0:  # steers based on turnDir, handles left or right
+            self.ang += turnRate * abs(turnDir) / turnDir
+        self
+
+        maxW, maxH = self.drawSurf.get_size()
+        selfCenter = pg.Vector2(self.rect.center)
+        turnDir = xvt = yvt = yat = xat = 0
+        turnRate = 120 * dt  # about 120 seems ok
+        margin = 60
         self.ang = self.ang + randint(-4, 4)
         # Grid update stuff
         self.grid_pos = self.grid.getcell(self.pos)
